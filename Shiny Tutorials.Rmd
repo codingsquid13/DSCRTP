@@ -1,0 +1,139 @@
+---
+title: "Shiny Tutorials"
+author: "Sydney Lewis"
+date: "2022-09-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Getting Started Tutorial 
+http://rstudio.github.io/shinydashboard/get_started.html
+
+
+## Installation 
+
+install.packages("shinydashboard")
+devtools::install_github("shiny", "rstudio")
+
+## Basics
+
+A dashboard has three parts: a header, a sidebar, and a body. Here’s the most minimal possible UI for a dashboard page.
+
+```{r eval=FALSE, include=FALSE}
+## ui.R ##
+library(shiny)
+library(shinydashboard)
+
+dashboardPage(
+  dashboardHeader(), #header- where you can name your dashboard
+  dashboardSidebar(), #sidebar- where you can make tabs
+  dashboardBody() #body- where graphs go 
+)
+```
+
+## Blank dashboard
+
+Obviously, this dashboard isn’t very useful. We’ll need to add components that actually do something. In the body we can add boxes that have content.
+
+```{r eval=FALSE, include=FALSE}
+## app.R ##
+library(shiny)
+library(shinydashboard)
+
+ui <- dashboardPage(
+  dashboardHeader(title = "Basic dashboard"), #"Deep-Sea Coral dashboard"
+  dashboardSidebar(), 
+  dashboardBody( #this sets the stage for inserting plots and such into the dashboard 
+    # Boxes need to be put in a row (or column)
+     fluidRow(
+      box(plotOutput("plot1", height = 250)), #I am not sure what plot1  
+
+      box(
+        title = "Controls",
+        sliderInput("slider", "Number of observations:", 1, 100, 50)
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+  set.seed(122)
+  histdata <- rnorm(500)
+
+  output$plot1 <- renderPlot({
+    data <- histdata[seq_len(input$slider)]
+    hist(data)
+  })
+}
+
+#shinyApp(ui, server)
+```
+
+## Basic dashboard
+
+Next, we can add content to the sidebar. For this example we’ll add menu items that behave like tabs. These function similarly to Shiny’s tabPanels: when you click on one menu item, it shows a different set of content in the main body.
+
+There are two parts that need to be done. First, you need to add menuItems to the sidebar, with appropriate tabNames.
+
+```{r}
+ui2<-
+  dashboardPage(
+  dashboardHeader(title = "Basic dashboard"), #create the title of the dashboard
+  dashboardSidebar( #labels for side tabs
+    sidebarMenu(
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
+      menuItem("Widgets", tabName = "widgets", icon = icon("th"))
+    )
+  ),
+  dashboardBody(
+    tabItems( #list of visuals that will be included when you click on each new tab
+      # First tab content
+      tabItem(tabName = "dashboard", #correspond tabName to sidebarMenu
+        fluidRow( 
+          box(plotOutput("plot1", height = 250)), #dimensions of graph
+          box(
+            title = "Controls", #title of slidebar 
+            sliderInput("slider", "Number of observations:", 1, 100, 50)
+          )
+        )
+      ),
+  # Second tab content
+      tabItem(tabName = "widgets", 
+        h2("Widgets tab content") #the words displayed on the Widgets tab
+      )
+)
+)
+)
+
+##This code is needed to help render the dashboard outside of R 
+server <- function(input, output) {
+  set.seed(122)
+  histdata <- rnorm(500)
+
+  output$plot1 <- renderPlot({
+    data <- histdata[seq_len(input$slider)]
+    hist(data)
+  })
+}
+
+shinyApp(ui2, server)
+
+```
+
+#Background: Shiny and HTML
+
+```{r}
+# A basic div
+div(class = "my-class", "Div content")
+```
+
+Div content
+```{r}
+# Nested HTML tags
+div(class = "my-class", p("Paragraph text"))
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

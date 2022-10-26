@@ -1,0 +1,128 @@
+---
+title: "DSCRTP dashboard play"
+author: "Sydney Lewis"
+date: "2022-09-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+Read in the datasheet 
+```{r}
+#Load the required library 
+library(googlesheets4)
+
+#Read google sheets data into R
+dsc <- read_sheet("https://docs.google.com/spreadsheets/d/1ndur-uZ5D-YHnGYjh913t4OM76X-GrWuS1-y2XazLSs/edit?usp=sharing")
+```
+
+
+Set up subset of dataset to work with 
+```{r pressure, echo=FALSE}
+library(dplyr)
+
+#Load in dsc csv
+#dsc<- read.csv("Deep-sea Coral Funded Project Assessment  - main (1).csv")
+
+#Remove columns with character values/ notes & links 
+dsc1<- subset(dsc, select= -c(POC, DSC_website, source, cruise_report))
+
+#Include only the first 50 rows
+dsc2<- dsc1[1:50,]
+
+#Replace ?, ??, ?? with NAs
+dsc2[ dsc2 == c("?", "??", "???") ] <- NA
+
+# Get rid of dollar signs
+dsc2$cost = as.numeric(gsub("\\$", "", dsc2$cost))
+
+#Replace NA values with 0
+dsc2$cost[is.na(dsc2$cost)] <- 0
+
+```
+
+Set up the framework of the dashboard by creating a ui. 
+
+```{r}
+library(shiny)
+
+# Define UI for app that draws a histogram ----
+ui_dsc <- fluidPage(
+
+  # App title ----
+  titlePanel("Shiny Barplot"),
+
+  # Sidebar layout with input and output definitions ----
+  sidebarLayout(
+
+    # Sidebar panel for inputs ----
+    sidebarPanel(
+
+      # Input: Slider for the number of bins ----
+      sliderInput(inputId = "bins",
+                  label = "Number of bins:",
+                  min = 1,
+                  max = 50,
+                  value = 30)
+
+    ),
+
+    # Main panel for displaying outputs ----
+    mainPanel(
+
+      # Output: Histogram ----
+      plotOutput(outputId = "distPlot")
+
+    )
+  )
+)
+
+```
+
+Create a server that will be used as a function to run plots in the ui framework. 
+
+```{r}
+# Define server logic required to draw a histogram ----
+server_dsc <- function(input, output) {
+
+  # Histogram of the Old Faithful Geyser Data ----
+  # with requested number of bins
+  # This expression that generates a histogram is wrapped in a call
+  # to renderPlot to indicate that:
+  #
+  # 1. It is "reactive" and therefore should be automatically
+  #    re-executed when inputs (input$bins) change
+  # 2. Its output type is a plot
+  output$distPlot <- renderPlot({
+
+    x    <- dsc2$cost 
+    bins <- seq(min(x),  max(x), length.out = input$bins + 1)
+
+    hist(x, breaks = bins, col = "#75AADB", border = "white",
+         xlab = "Funds Alloted by DSCRTP ($)",
+         main = "Histogram of Project Funding Amount")
+
+    })
+
+}
+```
+
+
+Render the dashboard
+```{r}
+dsc2$cost<- dsc2$cost / (10^3) #I did this because the values were so large it was difficult to interpret
+
+library(shiny)
+shinyApp(ui = ui_dsc, server = server_dsc)
+
+#moving forward I think that I would like to make the scale bar adjustable by year, not the number of bins that can be created... or perhaps in addition to 
+```
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

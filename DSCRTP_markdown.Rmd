@@ -1,0 +1,264 @@
+---
+title: "Deep dive into deep-sea coral and sponge research project outcomes"
+author: "Sydney Lewis"
+date: "2022-08-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Read in Google Sheet
+
+install.packages('googlesheets4')
+
+```{r cars}
+#Load the required library 
+library(googlesheets4)
+
+#Read google sheets data into R
+dsc <- read_sheet("https://docs.google.com/spreadsheets/d/1ndur-uZ5D-YHnGYjh913t4OM76X-GrWuS1-y2XazLSs/edit?usp=sharing")
+```
+
+Set up subset of dataset to work with 
+```{r pressure, echo=FALSE}
+#Load in dsc csv
+#dsc<- read.csv("Deep-sea Coral Funded Project Assessment  - main (1).csv")
+
+#Remove columns with character values/ notes & links 
+dsc1<- subset(dsc, select= -c(POC, DSC_website, source, cruise_report))
+
+#Include only the first 50 rows
+dsc2<- dsc1[1:50,]
+```
+
+
+##Plotting geospatial data
+*This could be used to visualize information about fishery regions: amount funding, objectives, NOMEC categories, ect.*
+https://www.paulamoraga.com/book-geospatial/sec-flexdashboard.html 
+
+#Set up 
+install.packages("rnaturalearth")
+install.packages("wbstats")
+```{r}
+#Create map object which includes countries name and iso_a3
+library(rnaturalearth)
+map <- ne_countries() #this is the only part that actually is the map 
+names(map)[names(map) == "iso_a3"] <- "ISO3"
+names(map)[names(map) == "name"] <- "NAME"
+
+#plot the map object
+library(sp)
+plot(map)
+
+#This step is retrieving data from World Bank - I will not need to do this step for my version
+library(wbstats)
+indicators <- wbsearch(pattern = "pollution")
+
+
+#Select indicators to plot- for me I may chose funding, and maybe project objectives? Could have to reformat
+d <- wb(
+  indicator = "EN.ATM.PM25.MC.M3", #decide to plot the indicators air pollution and mean annual exposure 
+  startdate = 2016, enddate = 2016 #for the year 2016
+)
+
+map$PM2.5 <- d[match(map$ISO3, d$iso3c), "value"] #match country codes to PM2.5 calues
+
+```
+
+#Create dashboard table
+install.packages("DT")
+```{r}
+#Create the intereactive table
+library(DT)
+DT::datatable(map@data[, c("ISO3", "NAME", "PM2.5")], #create a data table showing the following 3 variables
+  rownames = FALSE, options = list(pageLength = 10) #don't show row names  and page length is set to 10 rows
+)
+```
+
+#Create interactive map 
+install.packages("leaflet")
+```{r}
+library(leaflet)
+
+pal <- colorBin(
+  palette = "viridis", domain = map$PM2.5, #color the countries according to their PM2.5 value- change domain for yours
+  bins = seq(0, max(map$PM2.5, na.rm = TRUE) + 10, by = 10) #sequence ranges from 0 to max PM values in increments of 10
+)
+
+
+map$labels <- paste0(
+  "<strong> Country: </strong> ",
+  map$NAME, "<br/> ",
+  "<strong> PM2.5: </strong> ",
+  map$PM2.5, "<br/> "
+) %>%
+  lapply(htmltools::HTML) #write labels using html codes to show PM levels of each country- apply then to argument add polygon
+
+leaflet(map) %>%
+  addTiles() %>% #adds background map
+  setView(lng = 0, lat = 30, zoom = 2) %>% #center and zoom map- I can use this to center the map over the US
+  addPolygons(
+    fillColor = ~ pal(PM2.5), #color the areas by given PM2.5 values set in "pal" object
+    color = "white", #color border with white to see background
+    fillOpacity = 0.7,#thickness of border
+    label = ~labels, #add labels- code written in html above  
+    highlight = highlightOptions(
+      color = "black",
+      bringToFront = TRUE
+    )
+  ) %>%
+  leaflet::addLegend( #add legend
+    pal = pal, values = ~PM2.5,
+    opacity = 0.7, title = "PM2.5"
+  )
+
+```
+
+Notes: 
+- I need to create a column for this that indicates the region in dataset
+- I need to decide if I want to color a fisheries region, or the states associated with the fisheries region... I feel like the fisheries region itself would make more sense
+- explore what it would look like if I had the map being colored for different things: cost, objectives, NOMEC, ect.
+*ask Heather
+
+##Creating a pie chart
+*This could be used to show the proportion of different obectives funded over the years/ could compliment map*
+https://stackoverflow.com/questions/50319450/how-to-create-a-pie-chart-with-rstudio-flexdashboard 
+
+I like the idea of using a pie chart to show proportions of objectives funded over the years.
+
+Notes: 
+-I will have to group projects by start funding year
+- then pivot longer the objectives columns into one row with counts for the year
+- I want the variable that can be changed ontop to be year 
+
+```{r}
+library("plotly")
+
+totalref <- read.table(header = T, text = 
+"Country        Refugees   
+'Belgium'         508645
+'France'         2874490
+'Germany'       10893516
+'Ireland'         142555
+'Italy'           538407
+'Netherlands'    1900518
+'Portugal'          7918
+'Spain'            89946
+'United Kingdom' 3766855")
+
+plot_ly(totalref, labels = ~ Country, values = ~ Refugees, type = 'pie',
+        textposition = 'inside', textinfo = 'label+percent') %>%
+    layout (title='Persons of Concern in 9 European Countries',
+            showlegend = TRUE)
+```
+
+#Bar graph
+*The accompanying bargraph could show which NOAA offices were funded? This might not work well because there are so many different ones? Maybe if I oriented it sideways it wouldn't be so crowded?.. that is 27 variables*
+
+- maybe look at choosing line offices 
+- NCCOS, OAR, ect. pick fewer than 10 that are the most interesting 
+- make NMOS, NCCOS, and science centers should be on there 
+
+- Is there a way that we could group all of these into smaller divisions? Fisheries, oceans, ect.?
+
+# Playing around with Functions
+
+*Structure of a function* 
+my.func <- function(arg1, arg2, arg3, ...) {
+<commands>
+return(output.object)
+}
+
+The code below is an example of returning a single variable in a function :
+
+Translated, this function says “if you give me an object, that I
+will call x, I will store its mean() as meanval, then its sd() as sdval,
+and then return their ratio sdval/meanval.”
+```{r}
+coef.of.var <- function(x){
+meanval <- mean(x,na.rm=TRUE) # recall this means "ignore NAs"
+sdval <- sd(x,na.rm=TRUE)
+return(sdval/meanval)
+}
+```
+
+Now use the function with the 1973 New York ozone data 
+```{r}
+data(airquality) # make the data available in this R session
+coef.of.var(airquality$Ozone)
+```
+
+*Example: Returning multiple values
+
+A function can *return multiple objects/values by using list()* – which collects objects of (potentially) different types.
+
+The function below calculates estimates of the mean and standard deviation of a population, based on a vector (x) of observations;
+
+```{r}
+popn.mean.sd <- function(x){
+n <- length(x)
+mean.est <- mean(x,na.rm=TRUE)
+var.est <- var(x,na.rm=TRUE)*(n-1)/n
+est <- list(mean=mean.est, sd=sqrt(var.est))
+return(est)
+}
+```
+
+Applying our popn.mean.sd() function to the daily ozone concentrations in New York data;
+```{r}
+results <- popn.mean.sd(airquality$Ozone)
+ attributes(results) #list the attributes of the object returned
+
+results$mean
+results$sd
+
+
+#With my own data 
+
+results1 <- popn.mean.sd(dsc2$cost)
+ attributes(results1) 
+ 
+ results1$mean
+ 
+
+dsc2$project_ID<- as.character(dsc2$project_ID)
+dsc2$NMFS<- as.numeric(dsc2$NMFS)
+str(dsc2)
+ 
+```
+ 
+*Declaring functions with in functions*
+Usually, functions that take arguments, execute R commands, and return output will be enough. But functions can be declared and used inside a function;
+
+Translated; “if you given me a number, that I will call y, I will
+define a function I call square that takes a number that it calls x
+and returns x-squared, then similarly one I call cube that cubes,
+then I will return the sum of applying square to y and cube to y”.
+
+```{r}
+square.plus.cube <- function(y) {
+square <- function(x) { return(x*x) }
+cube <- function(x) { return(x^3) }
+return(square(y) + cube(y))
+}
+
+#Example
+square.plus.cube(4) #answer is 80
+```
+
+
+
+```{r}
+
+```
+
+ 
+ 
+ 
+ 
+ 
+ 
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent
+printing of the R code that generated the plot.
