@@ -16,9 +16,11 @@ Read in the datasheet
 ```{r}
 #Load the required library 
 library(googlesheets4)
+library(dplyr)
 
 #Read google sheets data into R
-dsc <- read_sheet("https://docs.google.com/spreadsheets/d/1ndur-uZ5D-YHnGYjh913t4OM76X-GrWuS1-y2XazLSs/edit?usp=sharing")
+dsc <- read_sheet("https://docs.google.com/spreadsheets/d/1ndur-uZ5D-YHnGYjh913t4OM76X-GrWuS1-y2XazLSs/edit?usp=sharing") %>% 
+  mutate(across(where(is.list), as.character))
 ```
 
 
@@ -26,14 +28,11 @@ Set up subset of dataset to work with
 ```{r pressure, echo=FALSE}
 library(dplyr)
 
-#Load in dsc csv
-#dsc<- read.csv("Deep-sea Coral Funded Project Assessment  - main (1).csv")
-
 #Remove columns with character values/ notes & links 
-dsc1<- subset(dsc, select= -c(POC, DSC_website, source, cruise_report))
+dsc1<- subset(dsc, select= -c(POC, DSC_website, source, cruise_report_site_char))
 
-#Include only the first 50 rows
-dsc2<- dsc1[1:50,]
+#Include only proejcts from the PAC (82 projects)
+dsc2<-dsc1[dsc1$PAC == '1', ]
 
 #Replace ?, ??, ?? with NAs
 dsc2[ dsc2 == c("?", "??", "???") ] <- NA
@@ -43,6 +42,7 @@ dsc2$cost = as.numeric(gsub("\\$", "", dsc2$cost))
 
 #Replace NA values with 0
 dsc2$cost[is.na(dsc2$cost)] <- 0
+
 
 ```
 
@@ -121,6 +121,103 @@ library(shiny)
 shinyApp(ui = ui_dsc, server = server_dsc)
 
 #moving forward I think that I would like to make the scale bar adjustable by year, not the number of bins that can be created... or perhaps in addition to 
+```
+
+
+Attempt 2 to set up a US map: 
+
+
+Below are the regions that are the U.S Regional Fishery Managament Council regions. 
+- Pacific (PAC): Washington, Idaho, Oregon, California
+- North Pacific (NP): Alaska
+- Western Pacific (WP): Hawaii
+- Gulf of Mexico (GOM): Texas, Louisiana, Mississippi, Alabama, Florida (1/2)
+- South Atlantic (SA): Florida (1/2), Georgia, South Carolina, North Carolina (1/2)
+- Mid Atlantic (MA): North Carolina (1/2), Virginia, Maryland, Pennsylvania, New Jersey, Deleware, New York
+- New England (NE): Massachusetts, Connecticut, Rhode Isalnd, New Hampshire, Maine
+- Caribbean: Puerto Rico, Virgin Islands 
+
+```{r}
+knitr::include_graphics("Fisheries-regions.png", dpi = 500)
+```
+
+https://cran.r-project.org/web/packages/usmap/vignettes/mapping.html 
+
+install.packages("usmap")
+```{r}
+library(usmap)
+library(ggplot2)
+
+
+plot_usmap(regions = "state") + 
+  labs(title = "US Counties",
+       subtitle = "This is a blank map of the counties of the United States.") + 
+  theme(panel.background = element_rect(color = "black", fill = "lightblue"))
+
+```
+```{r}
+map_data
+
+library(usmap)
+library(ggplot2)
+
+plot_usmap(data = statepop, values = "pop_2015", color = "red") + 
+  scale_fill_continuous(
+    low = "white", high = "red", name = "Population (2015)", label = scales::comma
+  ) + theme(legend.position = "right")
+
+
+```
+
+https://www.aamlai.com/wp-content/uploads/2020/05/AnimatedMap.html
+library(ggplot2)
+library(dplyr)
+library(gganimate)
+
+*PAC*
+```{r}
+###RUN THE BELOW THREE LINES OF CODE TOGETHER TO FORM PAC DATASET########
+#this creates a dataset with only PAC data in it
+pacdata<- dsc2[which(dsc2$PAC=="1")] %>% #only include PAC data 
+  dplyr::select(start_FY, PAC, cost) %>%
+  group_by(start_FY) %>% #group the data by year
+  summarise(num=n(),
+            totalcost=sum(cost)) 
+#This is creating a new column called region, I am filling it with PAC
+state<- "CA"
+pacdata$state<- state
+
+#Rename the "PAC" column to "num_projects"
+pacdata<- pacdata %>%
+  rename("num_projects" = "num")
+
+```
+
+```{r}
+library(usmap)
+library(ggplot2)
+
+pacmap<- plot_usmap(data = pacdata, values = "totalcost", color = "turquoise", include= c("CA", "OR", "WA", "ID") ) + 
+  scale_fill_continuous(
+    low = "white", high = "turquoise", name = "Money Funneled into PAC", label = scales::comma
+  ) + theme(legend.position = "right")
+
+
+
+
+```
+
+
+
+
+
+```{r}
+#First: create the initial data 
+coral<-dsc2 %>% dplyr::select(start_FY, NE, MA, SA, CAR, GM, PAC, WP, NP, cost) %>%
+  pivot_longer(cols=c("NE", "MA", "SA", "CAR", "GM", "PAC", "WP", "NP"),
+               names_to= "regions",
+               names_transform= ,
+               values_to= "presence")
 ```
 
 

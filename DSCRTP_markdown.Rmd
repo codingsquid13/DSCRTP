@@ -23,14 +23,28 @@ dsc <- read_sheet("https://docs.google.com/spreadsheets/d/1ndur-uZ5D-YHnGYjh913t
 
 Set up subset of dataset to work with 
 ```{r pressure, echo=FALSE}
-#Load in dsc csv
-#dsc<- read.csv("Deep-sea Coral Funded Project Assessment  - main (1).csv")
+library(dplyr)
 
 #Remove columns with character values/ notes & links 
-dsc1<- subset(dsc, select= -c(POC, DSC_website, source, cruise_report))
+dsc1<- subset(dsc, select= -c(POC, DSC_website, source, cruise_report_site_char))
 
-#Include only the first 50 rows
-dsc2<- dsc1[1:50,]
+#Include only proejcts from the PAC (82 projects)
+dsc2<-dsc1[dsc1$PAC == '1', ]
+
+#Replace ?, ??, ?? with NAs
+dsc2[ dsc2 == c("?", "??", "???") ] <- NA
+
+# Get rid of dollar signs
+dsc2$cost = as.numeric(gsub("\\$", "", dsc2$cost))
+
+#Replace NA values with 0
+dsc2$cost[is.na(dsc2$cost)] <- 0
+```
+
+
+Troubles with the str function
+```{r}
+str(dsc2)
 ```
 
 
@@ -40,17 +54,21 @@ https://www.paulamoraga.com/book-geospatial/sec-flexdashboard.html
 
 #Set up 
 install.packages("rnaturalearth")
+devtools::install_github("ropensci/rnaturalearthhires")
 install.packages("wbstats")
 ```{r}
 #Create map object which includes countries name and iso_a3
 library(rnaturalearth)
-map <- ne_countries() #this is the only part that actually is the map 
+library(rnaturalearthhires)
+map <- ne_download() #this is the only part that actually is the map 
 names(map)[names(map) == "iso_a3"] <- "ISO3"
 names(map)[names(map) == "name"] <- "NAME"
 
 #plot the map object
 library(sp)
 plot(map)
+
+
 
 #This step is retrieving data from World Bank - I will not need to do this step for my version
 library(wbstats)
@@ -64,6 +82,8 @@ d <- wb(
 )
 
 map$PM2.5 <- d[match(map$ISO3, d$iso3c), "value"] #match country codes to PM2.5 calues
+
+
 
 ```
 
@@ -152,6 +172,70 @@ plot_ly(totalref, labels = ~ Country, values = ~ Refugees, type = 'pie',
         textposition = 'inside', textinfo = 'label+percent') %>%
     layout (title='Persons of Concern in 9 European Countries',
             showlegend = TRUE)
+```
+
+```{r}
+data_offices<- dsc2[,8:32]
+colSums(data_offices)
+data_offices
+table(dsc2$NMFS)#52
+table(dsc2$SEFSC) #3
+table(dsc2$NEFSC) #3
+table(dsc2$SWFSC) #35
+table(dsc2$NWFSC) #30
+table(dsc2$PIFSC) #1
+table(dsc2$AFSC) #4
+table(dsc2$OST) #3
+table(dsc2$`NSL/SI`) #1
+table(dsc2$`Council(s)`) #3
+table(dsc2$NOS) #41
+table(dsc2$NCCOS) #23
+table(dsc2$ONMS) #35
+table(dsc2$FGBNMS) #3
+table(dsc2$GRNMS) #3
+table(dsc2$CINMS) #25
+table(dsc2$MBNMS) #4
+table(dsc2$CBNMS) #9
+table(dsc2$GFNMS) #6
+table(dsc2$OCNMS) #4
+table(dsc2$PMNM) #3
+table(dsc2$OAR) #4
+table(dsc2$OER) #3
+table(dsc2$NESDIS) #1
+table(dsc2$NCEI) #1
+
+
+library("plotly")
+
+
+office<- read.table(header = T, text = 
+"NOAA Office        Funded   
+'NMFS'               51
+'SEFSC'              3
+'NEFSC'              3
+'SWFSC'              35
+'NWFSC'              30
+'PIFSC'              1
+'AFSC'               4
+'OST'                3
+   
+
+")
+
+plot_ly(totalref, labels = ~ Country, values = ~ Refugees, type = 'pie',
+        textposition = 'inside', textinfo = 'label+percent') %>%
+    layout (title='Persons of Concern in 9 European Countries',
+            showlegend = TRUE)
+
+library(plyr)
+library(data.table)
+count(dsc2, 'NMFS')
+
+dsc2[, sum(freq), by=c(NMFS, NCEI)]
+View(dsc2)
+
+colSums(dsc2[ , c("NMFS", "NCEI", "NESDIS")])
+```
 ```
 
 #Bar graph
@@ -249,16 +333,20 @@ square.plus.cube(4) #answer is 80
 ```
 
 
-
+Using plotly() to create a map: 
+https://cran.r-project.org/web/packages/usmap/vignettes/mapping.html 
 ```{r}
+library(usmap)
+library(ggplot2)
 
+plot_usmap(regions = "counties") + 
+  labs(title = "US Counties",
+  
+       subtitle = "This is a blank map of the counties of the United States.") + 
+  theme(panel.background = element_rect(color = "black", fill = "lightblue"))
 ```
 
- 
- 
- 
- 
- 
+
  
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent
 printing of the R code that generated the plot.
